@@ -5,12 +5,13 @@ def scan(ip):
     ethernet_frame = sc.Ether(dst="ff:ff:ff:ff:ff:ff") 
     arp_scanner = sc.ARP(pdst=ip) # creating an object for the class .arp() we r creating an arp packet here as it deals with layer 3.
     arp_scan_packet = ethernet_frame / arp_scanner # created a packet which goes in the network broadcast address and send the arp request
-    answered = sc.srp(arp_scan_packet, timeout = 1)[0]
+    answered = sc.srp(arp_scan_packet, timeout = 1,verbose=False)[0] # saying we dont need more info
     #print(answered.summary())
+
+    print("IP addesss\t\t\tMAC ADDRESS")
     for i in answered:
-        print(f"The MAC address {i[1].src}")
-        print("-" *60)
-        print(f"The IP address {i[1].psrc}")
+        print(f"{i[1].psrc}                   {i[1].src}")
+       
 
 
 
