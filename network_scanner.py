@@ -1,7 +1,16 @@
 import scapy.all as sc 
 import optparse as op
+import os 
 
 def arguments():
+
+    #if user is not root then stop the user
+    if os.geteuid() != 0:
+        print("-" * 50)
+        print("[-] ROOT REQUIRED")
+        print("-" * 50)
+        exit(1)
+
     prase = op.OptionParser()
 
     prase.add_option("-i","--ip",dest="IP_ADDRESS",help="Takes an ip address")
@@ -10,19 +19,23 @@ def arguments():
 
     if not options.IP_ADDRESS:
         prase.error("Ip address is required. use --help")
-    else:
-        return options.IP_ADDRESS
+    
+    
+    
+    return options.IP_ADDRESS
     
 
 
 
 #basic function to do an ARP scan of an given ip 
 def scan(ip):
-    ethernet_frame = sc.Ether(dst="ff:ff:ff:ff:ff:ff") 
-    arp_scanner = sc.ARP(pdst=ip) # creating an object for the class .arp() we r creating an arp packet here as it deals with layer 3.
-    arp_scan_packet = ethernet_frame / arp_scanner # created a packet which goes in the network broadcast address and send the arp request
-    answered = sc.srp(arp_scan_packet, timeout = 1,verbose=False)[0] # saying we dont need more info
-    #print(answered.summary())
+    #create the layer 2 level
+    ethernet  = sc.Ether("ff:ff:ff:ff:ff:ff")
+    #create the level 3 packet
+    Ip_address = sc.ARP(ptsd=ip)
+    #combine the layer 2 and 3 and make a packet
+    packet = ethernet/Ip_address
+    answered = sc.srp(packet,timeout = 1,verbose=False)[0]
 
     info = []
     
