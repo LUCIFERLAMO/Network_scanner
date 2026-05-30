@@ -2,14 +2,15 @@ import scapy.all as sc
 
 #basic function to do an ARP scan of an given ip 
 def scan(ip):
+    ethernet_frame = sc.Ether(dst="ff:ff:ff:ff:ff:ff") 
     arp_scanner = sc.ARP(pdst=ip) # creating an object for the class .arp() we r creating an arp packet here as it deals with layer 3.
-    ethernet_frame = sc.Ether(dst="ff:ff:ff:ff:ff:ff")
     arp_scan_packet = ethernet_frame / arp_scanner # created a packet which goes in the network broadcast address and send the arp request
-    arp_scan_packet.show()
+    answered = sc.srp(arp_scan_packet, timeout = 1)[0]
+    print(answered.summary())
 
     
 
-scan("192.168.1.1")
+scan("192.168.1.1/24")
 
 
 
