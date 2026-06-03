@@ -16,17 +16,20 @@ def arguments():
     prase = op.OptionParser()
 
     prase.add_option("-i","--ip",dest="IP_ADDRESS",help="Takes an ip address")
-    prase.add_option("-o","--output",dest="FILENAME", help="Saving the output in a file (JSON format)", default=False) 
+    prase.add_option("-o","--output",dest="FILENAME", help="Saving the output in a file (JSON format)", default=False)
+    prase.add_option("-c","--Compare",dest="COMPARE",help="Check if new devices have been connected or left", default=False,action="store_true")
 
     (options,arguments) = prase.parse_args()
 
     if not options.IP_ADDRESS:
         prase.error("Ip address is required. use --help")
     if options.FILENAME:
-        return options.IP_ADDRESS,options.FILENAME  
+        return options.IP_ADDRESS,options.FILENAME,False
+    if options.COMPARE:
+        return options.IP_ADDRESS,None,True
     
      
-    return options.IP_ADDRESS, None
+    return options.IP_ADDRESS, None ,None
     
 
 
@@ -99,28 +102,90 @@ def print_details(data,oui_Dictionary):
         vendor = call_OUI(i["mac"],oui_Dictionary)
         print(i["ip"] + "\t\t\t" + i["mac"]+"\t" +vendor)
 
-
+#fucntion to store the TOOL output in a user specified file
 def store_output(data,oui_Dictionary,filename):
 
-
+    result = []
     for i in data:
         vendor = call_OUI(i["mac"],oui_Dictionary)
         mac = i["mac"]
         ip = i["ip"]
 
-        store_value = {"IP":ip, "MAC":mac, "VENDOR":vendor}
+        result.append({"IP":ip, "MAC":mac, "VENDOR":vendor})
 
-        with open(filename,"a")as f:
-            json.dump(store_value,f,indent=3)
+    with open(filename,"w")as f:
+        json.dump(result,f,indent=3)
         
-    print("Data Stored!")    
+    print("Data Stored!")  
 
-IP,filename = arguments()
+#--------------------------------------------------------------------
+# New Device Detection 
+# ------------------------------------------------------------------
+
+baseline_file = "baseline.json"
+
+#function to store the current scan in the baseline file
+
+def save_baseline(data,OUI_Database):
+    result = []
+    for i in data:
+        vendor = call_OUI(i["mac"],OUI_Database)
+        result.append({"IP":i["ip"], "MAC":i["mac"], "VENDOR":vendor})
+    with open(baseline_file,"w")as f:
+        json.dump(result,f,indent=3)
+    
+    print("Baseline saved")
+
+#function to load/return the baseline file 
+def load_baseline():
+    with open(baseline_file,"r")as f:
+        return json.load(f)
+    
+#function that compares the current mac address to the baseline mac address
+def detect_changes(data,OUI_Database):
+    if not os.path.exists(baseline_file):
+        print("No baseline file exists!")
+        save_baseline(data,OUI_Database)
+        return
+    
+    baseline = load_baseline()
+
+    baseline_mac = {d["MAC"]:d for d in baseline}
+    current_mac = {d["mac"]:d for d in data} 
+
+    #actual comparision
+
+    new_devices = [mac for mac in current_mac if mac not in baseline_mac]
+    gone_devices = [mac for mac in baseline_mac if mac not in current_mac]
+
+    if not new_devices and not gone_devices:
+        return "No changes occured"
+    
+    if new_devices:
+        print("New device detected.")
+        for mac in new_devices:
+            ip = current_mac[mac]["ip"]
+            vendor = call_OUI(mac,OUI_Database)
+            print(f"IP: {ip}  MAC: {mac} VENDOR: {vendor}")
+
+    if gone_devices:
+        print("Devices that left the network")
+        for mac in gone_devices:
+            ip = baseline_mac[mac]["IP"]
+            vendor = baseline_mac[mac]["VENDOR"]
+            print(f"IP: {ip} MAC: {mac} VENDOR: {vendor}")
+
+        
+
+
+IP,filename,Compare = arguments()
 Download_OUI()
 OUI_Dictionary = load_OUI()
 data = scan(IP)
 
-if filename:
+if Compare:
+    detect_changes(data,OUI_Dictionary)
+elif filename:
       store_output(data,OUI_Dictionary,filename)
 else:      
       print_details(data,OUI_Dictionary)
