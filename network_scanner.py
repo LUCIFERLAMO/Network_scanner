@@ -3,6 +3,7 @@ import optparse as op
 import os 
 import requests
 import json
+import ipaddress
 
 def arguments():
 
@@ -15,21 +16,19 @@ def arguments():
 
     prase = op.OptionParser()
 
+    
     prase.add_option("-i","--ip",dest="IP_ADDRESS",help="Takes an ip address")
     prase.add_option("-o","--output",dest="FILENAME", help="Saving the output in a file (JSON format)", default=False)
     prase.add_option("-c","--Compare",dest="COMPARE",help="Check if new devices have been connected or left", default=False,action="store_true")
-
+    prase.add_option("-s","--Spoof",dest="SPOOF",help="Run ARP spoof detection", default=False, action="store_true")
     (options,arguments) = prase.parse_args()
 
     if not options.IP_ADDRESS:
-        prase.error("Ip address is required. use --help")
-    if options.FILENAME:
-        return options.IP_ADDRESS,options.FILENAME,False
-    if options.COMPARE:
-        return options.IP_ADDRESS,None,True
-    
-     
-    return options.IP_ADDRESS, None ,None
+       detected = get_default_network()
+       print(f"[*] No target specified. Auto-detected network: {detected}")
+       options.IP_ADDRESS = detected
+
+    return options.IP_ADDRESS, options.FILENAME, options.COMPARE, options.SPOOF
     
 
 
@@ -175,20 +174,94 @@ def detect_changes(data,OUI_Database):
             vendor = baseline_mac[mac]["VENDOR"]
             print(f"IP: {ip} MAC: {mac} VENDOR: {vendor}")
 
+#------------------------------------
+# Retriving the default gateway ip if the user did not specify a ip address 
+#------------------------------------
+
+def get_default_network():
+   Default_gateway = sc.conf.route.route("0.0.0.0")[2] 
+
+   result = ipaddress.IPv4Network(Default_gateway +"/24" ,strict=False)
+
+   return str(result)
+
+#------------------------------------------
+# Checking if there r any one mac but 2 ip situation (arp Spoofing)
+# -----------------------------------------
+
+def detect_arp_spoofing(data,OUI_Database):
+    mac_to_ip = {}
+    for i in data:
+        ip =  i["ip"]
+        mac = i["mac"]
+        if mac not in mac_to_ip:
+            mac_to_ip[mac] = []
         
+        mac_to_ip[mac].append(ip)
+        
+    spoofing_detected =False
+    for mac , ips in mac_to_ip.items():
+        if len(ips) > 1:
+            spoofing_detected = True
+            print("[!!!] DUPLICATE MAC DETECTED - possible ARP spoof!")
+            print(f"MAC {mac}      is claimed by multiple IPS  {', ' .join(ips)}")
+            vendor = call_OUI(mac,OUI_Database)
+            print(f"Vendor :{vendor}")
 
+#------------------------------
+# checking if the default gateway mac has be changed by comeparing the current scan with the baseline scan
+# -----------------------------
 
-IP,filename,Compare = arguments()
+    gateway_ip = sc.conf.route.route("0.0.0.0")[2]
+    current_gateway_mac = None
+
+    for i in data:
+        if i["ip"] == gateway_ip:
+            current_gateway_mac = i["mac"]
+            break
+    
+    if current_gateway_mac == None:
+        print("[*] Gateway not found in the current scan")    
+        exit(1)
+    elif os.path.exists("baseline.json"):
+        with open("baseline.json","r") as f:
+            result = json.load(f)
+        baseline_gateway_mac = None
+        for i in result:
+            if i["IP"] == gateway_ip:
+                baseline_gateway_mac = i["MAC"]
+                break
+
+            # ensuring that we have the gateway mac from the router first as we dont want to comepare the current mac with a None
+        if baseline_gateway_mac and current_gateway_mac != baseline_gateway_mac:
+                spoofing_detected = True
+                print(f"\n[!!!] GATEWAY MAC CHANGED — possible ARP spoof!")
+                print(f"      Gateway IP  : {gateway_ip}")
+                print(f"      Baseline MAC: {baseline_gateway_mac}")
+                print(f"      Current MAC : {current_gateway_mac}")
+        else:
+                print("[+] Gateway MAC unchanged.")
+    else:
+        print(f"[*] No baseline to compare gateway MAC. Current: {current_gateway_mac}")
+
+    if not spoofing_detected:
+        print("[+] No ARP spoofing detected.")
+        
+ 
+
+IP,filename,Compare,spoof = arguments()
 Download_OUI()
 OUI_Dictionary = load_OUI()
 data = scan(IP)
 
+print_details(data, OUI_Dictionary)
+
 if Compare:
-    detect_changes(data,OUI_Dictionary)
-elif filename:
-      store_output(data,OUI_Dictionary,filename)
-else:      
-      print_details(data,OUI_Dictionary)
+    detect_changes(data, OUI_Dictionary)
+if spoof:
+    detect_arp_spoofing(data, OUI_Dictionary)
+if filename:
+    store_output(data, OUI_Dictionary, filename)
 
 
 
