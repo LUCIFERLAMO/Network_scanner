@@ -19,8 +19,8 @@
 ## Installation
 
 ```bash
-git clone https://github.com/LUCIFERLAMO/netscan.git
-cd netscan
+git clone https://github.com/LUCIFERLAMO/network_scanner.git
+cd network_scanner
 pip install scapy rich requests
 ```
 
@@ -29,12 +29,12 @@ pip install scapy rich requests
 ## Usage
 
 ```bash
-sudo python3 netscan.py                        # auto-detects your subnet
-sudo python3 netscan.py -i 192.168.1.0/24     # scan specific subnet
-sudo python3 netscan.py -o results.json       # save output
-sudo python3 netscan.py -c                    # detect new/removed devices
-sudo python3 netscan.py -s                    # ARP spoof detection
-sudo python3 netscan.py -i 192.168.1.0/24 -o results.json -c -s
+sudo python3 network_scanner.py                                            # auto-detects your subnet
+sudo python3 network_scanner.py -i 192.168.1.0/24                        # scan specific subnet
+sudo python3 network_scanner.py -o results.json                           # save output
+sudo python3 network_scanner.py -c                                        # detect new/removed devices
+sudo python3 network_scanner.py -s                                        # ARP spoof detection
+sudo python3 network_scanner.py -i 192.168.1.0/24 -o results.json -c -s  # all flags
 ```
 
 ---
@@ -56,4 +56,4 @@ sudo python3 netscan.py -i 192.168.1.0/24 -o results.json -c -s
 
 ## License
 
-MIT — This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
